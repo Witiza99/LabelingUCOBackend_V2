@@ -1,47 +1,52 @@
+/*******************************Imports***********************************/
 const express = require('express');
 const { ExifTool } = require('exiftool-vendored');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const cors = require('cors'); // Importar cors
-const { spawn } = require('child_process'); // Importar spawn correctamente
+const cors = require('cors');
+const { spawn } = require('child_process');
 const os = require('os');
 const archiver = require('archiver');
-const { v4: uuidv4 } = require('uuid'); // Asegúrate de instalar 'uuid'
+const { v4: uuidv4 } = require('uuid');
 
-const corsOptions = {
-    origin: 'http://localhost:4200', // URL del frontend Angular
-    optionsSuccessStatus: 200, // Algunos navegadores antiguos (IE11, varios SmartTVs) interpretan erroneamente los codigos 204 como fallos
-};
-
+/****************************Conf/Variable***********************************/
 const app = express();
 const PORT = process.env.PORT || 3000;
 const exiftool = new ExifTool();
 
-// Configuración de multer para gestionar la carga de archivos
+// Cors conf
+const corsOptions = {
+    origin: 'http://localhost:4200', // frontend Angular URL
+    optionsSuccessStatus: 200, 
+};
+
+// Multer conf
 const upload = multer({ dest: os.tmpdir() });
+
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors(corsOptions));
 
 
-// Ruta para procesar videos y devolver archivos modificados
-app.post('/api/procesar-video', upload.array('files'), async (req, res) => {
+/*******************************API***********************************/
+// Get file and frame rate, return zip with images from video processing
+app.post('/api/process-video', upload.array('files'), async (req, res) => {
     const frameRates = JSON.parse(req.body.frameRates);
     console.log(frameRates);
     const files = req.files;
     const processedFiles = [];
 
-    // Generar un UUID para esta solicitud
+    // Generate UUID for this
     const requestId = uuidv4();
     const outputDir = path.join(os.tmpdir(), 'processed_images_${requestId}');
-    // Borrar el directorio outputDir si existe previamente
+    // Delete dir outputDir if exists
     if (fs.existsSync(outputDir)) {
         fs.rmSync(outputDir, { recursive: true });
     }
 
-    // Crear el directorio outputDir nuevamente
+    // Create new outputDir
     fs.mkdirSync(outputDir);
 
     try {
@@ -58,65 +63,63 @@ app.post('/api/procesar-video', upload.array('files'), async (req, res) => {
             processedFiles.push(...outputImages);
         }
 
-        console.log("Creando el zip");
-        // Nombre del archivo ZIP que se enviará
+        console.log("Creating zip...");
+        // Zip name
         const zipFileName = 'processed_files.zip';
 
-        // Configurar Archiver para comprimir los archivos en un ZIP
+        // Zip Conf
         const archive = archiver('zip', {
-            zlib: { level: 9 } // Nivel de compresión máximo
+            zlib: { level: 9 } // Max lvl compression
         });
 
-        // Configurar salida hacia el cliente
-        res.attachment(zipFileName); // Establecer el nombre del archivo para la descarga
-        archive.pipe(res); // Canalizar la salida hacia la respuesta HTTP
+        // Conf Zip to res
+        res.attachment(zipFileName);
+        archive.pipe(res);
 
-         // Agregar archivos al ZIP desde processedFiles
          processedFiles.forEach(filePath => {
-            const fileName = path.basename(filePath); // Obtener el nombre del archivo seguro
-            console.log("Agregando la imagen-> " + fileName);
-            // Agregar cada archivo al ZIP usando su ruta y nombre
+            const fileName = path.basename(filePath); 
+            console.log("Add image -> " + fileName);
             archive.append(fs.createReadStream(filePath), { name: fileName });
         });
 
-        // Finalizar el ZIP y enviarlo
+        // Send ZIP
         archive.finalize();
 
-        // Eventos para asegurarse de que el zip se ha enviado correctamente
+        // Event for check if zip is send
         archive.on('end', () => {
-            console.log('Enviado el zip');
+            console.log('Zip was sent');
         });
 
         archive.on('error', (err) => {
-            console.error('Error al crear el zip:', err);
-            res.status(500).send({ error: 'Error al crear el zip.' });
+            console.error('Error creating zip:', err);
+            res.status(500).send({ error: 'Error creating zip.' });
         });
         
     } catch (error) {
-        console.error('Error al procesar los videos:', error);
-        res.status(500).json({ error: 'Error al procesar los videos.' });
+        console.error('Error processing files:', error);
+        res.status(500).json({ error: 'Error processing files.' });
     }
 });
 
-// Ruta para manejar la carga de imagen con metadatos
-app.post('/api/agregar-metadatos', upload.single('imagen'), async (req, res) => {
+// Get image and metadata, return image with image and metadata
+app.post('/api/add-metadata', upload.single('imagen'), async (req, res) => {
     const jsonMetadata = req.body.jsonMetadata;
     const { path: imagePath } = req.file;
     console.log(jsonMetadata);
 
     try {
         if (fs.existsSync(imagePath)) {
-            // Escribir en el campo UserComment
+            // Write on tag UserComment
             await exiftool.write(imagePath, { UserComment: jsonMetadata });
             console.log('UserComment written successfully');
 
             const modifiedImagePath = path.isAbsolute(imagePath) ? imagePath : path.join(__dirname, imagePath);
 
-            // Leer todos los tags disponibles
+            // Read all tags
             const tags = await exiftool.read(modifiedImagePath);
             console.log(`Tags: ${JSON.stringify(tags, null, 2)}`);
 
-            // Verificar si UserComment está presente en los tags
+            // Check if UserComment exist
             if (tags.UserComment) {
                 console.log(`UserComment: ${tags.UserComment}`);
             } else {
@@ -129,53 +132,21 @@ app.post('/api/agregar-metadatos', upload.single('imagen'), async (req, res) => 
             res.status(400).json({ error: 'The specified image path does not exist.' });
         }
     } catch (error) {
-        console.error('Error al embeber metadatos en la imagen:', error);
-        res.status(500).json({ error: 'Error al embeber metadatos en la imagen.' });
+        console.error('Error embedding metadata in image:', error);
+        res.status(500).json({ error: 'Error embedding metadata in image.' });
     }
 });
-
 
 app.listen(PORT, () => {
-    console.log(`Servidor backend iniciado en puerto ${PORT}`);
+    console.log(`Backend server start port ${PORT}`);
 });
 
-// Finalizar el proceso de exiftool al cerrar la aplicación
-process.on('exit', async () => {
-    await exiftool.end();
-});
+/*******************************FUNCTIONS***********************************/
 
-// Manejar la señal SIGINT para una terminación limpia
-process.on('SIGINT', async () => {
-    try {
-        await exiftool.end();
-        console.log('ExifTool finalizado correctamente.');
-        process.exit();
-    } catch (err) {
-        console.error('Error al finalizar ExifTool:', err);
-        process.exit(1);
-    }
-});
-
-/*
-// Función para limpiar un directorio específico
-function cleanupDirectory(directory) {
-    fs.readdir(directory, (err, files) => {
-        if (err) throw err;
-
-        for (const file of files) {
-            const filePath = path.join(directory, file);
-            fs.unlink(filePath, err => {
-                if (err) throw err;
-                console.log(`Archivo ${filePath} eliminado correctamente.`);
-            });
-        }
-    });
-}*/
-
-// Función para obtener el framerate máximo del video
+// Function to get Max Frame Rate
 async function getMaxFrameRate(videoPath) {
     return new Promise((resolve, reject) => {
-        // Argumentos para ffprobe para obtener el framerate máximo del video
+        // Args for ffprobe to get max frame rate
         const ffprobeArgs = [
             '-v', 'error',
             '-select_streams', 'v:0',
@@ -198,37 +169,25 @@ async function getMaxFrameRate(videoPath) {
 
         ffprobeProcess.on('close', (code) => {
             if (code !== 0) {
-                console.error(`ffprobe finalizó con código de error ${code}`);
-                reject(`ffprobe finalizó con código de error ${code}`);
+                console.error(`ffprobe had error ${code}`);
+                reject(`ffprobe had error ${code}`);
             }
         });
 
         ffprobeProcess.on('error', (err) => {
-            console.error('Error al ejecutar ffprobe:', err);
+            console.error('Error with ffprobe:', err);
             reject(err);
         });
     });
 }
 
-function getFilesInDirectory(directory) {
-    const files = fs.readdirSync(directory);
-    return files.map(file => {
-        const filePath = path.join(directory, file);
-        const fileStats = fs.statSync(filePath);
-        const fileData = fs.readFileSync(filePath);
-        // Aquí aseguramos que el nombre del archivo no esté vacío
-        const fileName = file || 'unknown.png'; // En caso de que el nombre sea vacío, asignamos uno por defecto
-
-        return new File([fileData], fileName, { type: 'image/png', lastModified: fileStats.mtime });
-    });
-}
-
-// Función para obtener los paths de los archivos en un directorio
+// Function to get Files path from directory
 function getFilePathsInDirectory(directory) {
     const files = fs.readdirSync(directory);
     return files.map(file => path.join(directory, file));
 }
 
+// Function to process Video 
 async function processVideo(videoPath, requestedFrameRate, maxFrameRate, outputDir, i) {
     return new Promise((resolve, reject) => {
         let outputImages = [];
@@ -245,13 +204,11 @@ async function processVideo(videoPath, requestedFrameRate, maxFrameRate, outputD
 
         ffmpegProcess.on('close', (code) => {
             if (code === 0) {
-                // Obtener los paths de las imágenes procesadas
+                // Get paths
                 const imagePaths = getFilePathsInDirectory(outputDir);
-
-                // Resolver la promesa con los paths y los datos de las imágenes si es necesario
                 resolve(imagePaths);
             } else {
-                reject(`FFmpeg finalizó con código de error ${code}`);
+                reject(`Error with FFmpeg -> ${code}`);
             }
         });
 
@@ -260,3 +217,24 @@ async function processVideo(videoPath, requestedFrameRate, maxFrameRate, outputD
         });
     });
 }
+
+
+/*******************************SIGNALS***********************************/
+// End exiftool
+process.on('exit', async () => {
+    await exiftool.end();
+});
+
+// Control SIGINT 
+process.on('SIGINT', async () => {
+    try {
+        await exiftool.end();
+        console.log('ExifTool finalizado correctamente.');
+        process.exit();
+    } catch (err) {
+        console.error('Error al finalizar ExifTool:', err);
+        process.exit(1);
+    }
+});
+
+
