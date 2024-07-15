@@ -17,7 +17,7 @@ const exiftool = new ExifTool();
 
 // Cors conf
 const corsOptions = {
-    origin: 'http://localhost:4200', // frontend Angular URL
+    origin: process.env.CORS_ORIGIN || 'http://localhost:4200', // frontend Angular URL
     optionsSuccessStatus: 200, 
 };
 
