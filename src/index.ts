@@ -503,7 +503,18 @@ async function processVideo(videoPath: string, requestedFrameRate: number, maxFr
             if (code === 0) {
                 try {
                     // Read images from the temporary directory
-                    const filenames = await fsPromises.readdir(outputDir);
+                    let filenames = await fsPromises.readdir(outputDir);
+
+                    // Sort filenames to ensure they are processed in the correct order
+                    filenames = filenames.sort((a, b) => {
+                        const aMatch = a.match(/(\d+)\.png$/);
+                        const bMatch = b.match(/(\d+)\.png$/);
+                        if (aMatch && bMatch) {
+                            return parseInt(aMatch[1], 10) - parseInt(bMatch[1], 10);
+                        }
+                        return 0;
+                    });
+
                     const imageBuffers = await Promise.all(filenames.map(async (filename) => {
                         const filePath = path.join(outputDir, filename);
                         return fsPromises.readFile(filePath);
