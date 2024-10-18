@@ -36,12 +36,20 @@ const corsOptions = {
 
         // Registrar el origen de la solicitud
         console.log('Solicitud recibida desde el origen:', origin);
+<<<<<<< HEAD
 	// Log para verificar los orígenes permitidos
+=======
+        // Log para verificar los orígenes permitidos
+>>>>>>> 5196fdfda0d5891b4a525fff1cad831d24d21922
         console.log('Orígenes permitidos:', allowedOrigins);
 
         // Verificar si el origen está permitido
         if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+<<<<<<< HEAD
 	    console.log('Origin allowed:', origin); // Log si el origen está permitido
+=======
+            console.log('Origin allowed:', origin); // Log si el origen está permitido
+>>>>>>> 5196fdfda0d5891b4a525fff1cad831d24d21922
             callback(null, true); // Permitir el origen
         } else {
             console.log('Origin not allowed:', origin); // Log si el origen no está permitido
@@ -50,6 +58,7 @@ const corsOptions = {
     },
     optionsSuccessStatus: 200 // Para manejar correctamente el status de las opciones
 };
+
 
 // Multer conf
 const upload = multer({ dest: os.tmpdir() });
