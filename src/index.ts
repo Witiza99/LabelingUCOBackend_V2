@@ -34,13 +34,21 @@ const corsOptions = {
     origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
         const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:4200').split(',');
 
+        // Registrar el origen de la solicitud
+        console.log('Solicitud recibida desde el origen:', origin);
+	// Log para verificar los orígenes permitidos
+        console.log('Orígenes permitidos:', allowedOrigins);
+
+        // Verificar si el origen está permitido
         if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
+	    console.log('Origin allowed:', origin); // Log si el origen está permitido
+            callback(null, true); // Permitir el origen
         } else {
-            callback(new Error('Not allowed by CORS'));
+            console.log('Origin not allowed:', origin); // Log si el origen no está permitido
+            callback(new Error('Not allowed by CORS')); // Bloquear el origen
         }
     },
-    optionsSuccessStatus: 200
+    optionsSuccessStatus: 200 // Para manejar correctamente el status de las opciones
 };
 
 // Multer conf
@@ -59,14 +67,14 @@ const sessionData: { [key: string]: SessionData } = {};
 
 
 /***********test*********/
-/*
+
 // Middleware to test incoming requests
 app.use((req: Request, res: Response, next: NextFunction) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
     console.log('Encabezados:', req.headers);
     console.log('Cuerpo:', req.body);
     next();
-});*/
+});
 
 /*******************************API***********************************/
 // Endpoint to test backend
@@ -76,6 +84,7 @@ app.get('/test', (req, res) => {
 
 // Endpoint to create a new session
 app.post('/api/start-session', (req, res) => {
+console.log("entro aca");
     const sessionId = uuidv4();
     sessionData[sessionId] = {
         images: [],  // Start array empty
